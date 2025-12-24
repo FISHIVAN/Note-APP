@@ -1,11 +1,10 @@
 package com.example.note.ui
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -25,6 +24,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.res.stringResource
+import com.example.note.R
 import com.example.note.ui.screen.NoteEditScreen
 import com.example.note.ui.screen.NoteListScreen
 import com.example.note.ui.screen.TodoScreen
@@ -118,10 +119,11 @@ fun MainScreen(
     onAddTodoClick: () -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val items = listOf("Notes", "Todos")
-    val icons = listOf(Icons.Default.Description, Icons.Default.CheckCircle)
+    val items = listOf(R.string.notes, R.string.todos)
+    val icons = listOf(Icons.Default.Description, Icons.AutoMirrored.Filled.Assignment)
 
     Scaffold(
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         bottomBar = {
             NavigationBar {
                 items.forEachIndexed { index, item ->
@@ -139,7 +141,7 @@ fun MainScreen(
                         icon = { 
                             Icon(
                                 icons[index], 
-                                contentDescription = item,
+                                contentDescription = stringResource(item),
                                 modifier = Modifier
                                     .size(26.dp) // Slightly larger base size
                                     .scale(scale)
@@ -147,14 +149,14 @@ fun MainScreen(
                         },
                         label = { 
                             Text(
-                                text = item,
+                                text = stringResource(item),
                                 style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
                                 fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal
                             ) 
                         },
                         selected = isSelected,
                         onClick = { selectedTab = index },
-                        alwaysShowLabel = true
+                        alwaysShowLabel = false
                     )
                 }
             }
@@ -170,17 +172,33 @@ fun MainScreen(
         // Actually, innerPadding from MainScreen should be applied to the container of the child screens.
         
         androidx.compose.foundation.layout.Box(modifier = Modifier.padding(innerPadding)) {
-            when (selectedTab) {
-                0 -> NoteListScreen(
-                    viewModel = noteViewModel,
-                    onNoteClick = onNoteClick,
-                    onAddNoteClick = onAddNoteClick
-                )
-                1 -> TodoScreen(
-                    viewModel = todoViewModel,
-                    onTodoClick = onTodoClick,
-                    onAddTodoClick = onAddTodoClick
-                )
+            AnimatedContent(
+                targetState = selectedTab,
+                label = "tab_animation",
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        // 0 -> 1: Slide left
+                        (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                            slideOutHorizontally { width -> -width } + fadeOut())
+                    } else {
+                        // 1 -> 0: Slide right
+                        (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                            slideOutHorizontally { width -> width } + fadeOut())
+                    }
+                }
+            ) { targetTab ->
+                when (targetTab) {
+                    0 -> NoteListScreen(
+                        viewModel = noteViewModel,
+                        onNoteClick = onNoteClick,
+                        onAddNoteClick = onAddNoteClick
+                    )
+                    1 -> TodoScreen(
+                        viewModel = todoViewModel,
+                        onTodoClick = onTodoClick,
+                        onAddTodoClick = onAddTodoClick
+                    )
+                }
             }
         }
     }

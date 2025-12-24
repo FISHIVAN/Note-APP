@@ -1,11 +1,16 @@
 package com.example.note.ui.screen
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -58,6 +64,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.note.data.Todo
 import com.example.note.viewmodel.TodoViewModel
+
+import androidx.compose.ui.res.stringResource
+import com.example.note.R
+
+import java.text.DateFormat
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +87,7 @@ fun TodoScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(onClick = onAddTodoClick) {
-                Icon(Icons.Default.Add, contentDescription = "Add Todo")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_todo))
             }
         }
     ) { innerPadding ->
@@ -117,7 +129,7 @@ fun TodoScreen(
                         .padding(bottom = 16.dp)
                 ) {
                     Text(
-                        text = "Todos",
+                        text = stringResource(R.string.todos),
                         style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
@@ -145,8 +157,8 @@ fun TodoListContent(
     if (todoToDelete != null) {
         AlertDialog(
             onDismissRequest = { todoToDelete = null },
-            title = { Text("Delete Todo") },
-            text = { Text("Are you sure you want to delete this todo?") },
+            title = { Text(stringResource(R.string.delete_todo)) },
+            text = { Text(stringResource(R.string.confirm_delete_todo)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -154,12 +166,12 @@ fun TodoListContent(
                         todoToDelete = null
                     }
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { todoToDelete = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             },
             shape = MaterialTheme.shapes.extraLarge
@@ -168,7 +180,7 @@ fun TodoListContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp, top = topPadding),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp, top = topPadding),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(todos, key = { it.id }) { todo ->
@@ -201,7 +213,7 @@ fun TodoListContent(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
+                            contentDescription = stringResource(R.string.delete),
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
@@ -225,12 +237,32 @@ fun TodoItem(
     onToggle: () -> Unit,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "scale"
+    )
+
     Card(
-        onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier
@@ -255,7 +287,7 @@ fun TodoItem(
                 )
                 if (todo.deadline != null) {
                     Text(
-                        text = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(todo.deadline)),
+                        text = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(todo.deadline)),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )

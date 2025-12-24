@@ -1,13 +1,19 @@
 package com.example.note.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material3.Surface
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -45,12 +51,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.note.data.Todo
 import com.example.note.viewmodel.TodoViewModel
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 import androidx.compose.material3.AlertDialog
+
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+
+import androidx.compose.ui.res.stringResource
+import com.example.note.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,26 +101,45 @@ fun TodoEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (todoId == -1L) "New Todo" else "Edit Todo") },
+                title = { Text(if (todoId == -1L) stringResource(R.string.new_todo) else stringResource(R.string.edit_todo)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                if (content.isNotBlank()) {
-                    viewModel.saveTodo(
-                        id = todoId,
-                        content = content,
-                        deadline = if (hasDeadline) deadlineTimestamp else null
-                    )
-                }
-                onNavigateUp()
-            }) {
-                Icon(Icons.Default.Check, contentDescription = "Save")
+            val interactionSource = remember { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val scale by animateFloatAsState(
+                targetValue = if (isPressed) 0.9f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "fab_scale"
+            )
+            FloatingActionButton(
+                onClick = {
+                    if (content.isNotBlank()) {
+                        viewModel.saveTodo(
+                            id = todoId,
+                            content = content,
+                            deadline = if (hasDeadline) deadlineTimestamp else null
+                        )
+                    }
+                    onNavigateUp()
+                },
+                interactionSource = interactionSource,
+                modifier = Modifier
+                    .imePadding()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+            ) {
+                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
             }
         }
     ) { innerPadding ->
@@ -112,63 +147,97 @@ fun TodoEditScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TextField(
-                value = content,
-                onValueChange = { content = it },
-                placeholder = { Text("What needs to be done?", style = MaterialTheme.typography.headlineSmall) },
-                textStyle = MaterialTheme.typography.headlineSmall,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
+            // Content Block
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Set Deadline",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Switch(
-                    checked = hasDeadline,
-                    onCheckedChange = { hasDeadline = it }
+                TextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    placeholder = { Text(stringResource(R.string.todo_placeholder), style = MaterialTheme.typography.headlineSmall) },
+                    textStyle = MaterialTheme.typography.headlineSmall,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp)
                 )
             }
 
-            if (hasDeadline) {
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { showDatePicker = true },
-                        modifier = Modifier.weight(1f)
+            // Deadline Block
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = null)
-                        Spacer(modifier = Modifier.padding(4.dp))
-                        Text(SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(deadlineTimestamp)))
+                        Text(
+                            text = stringResource(R.string.set_deadline),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Switch(
+                            checked = hasDeadline,
+                            onCheckedChange = { hasDeadline = it }
+                        )
                     }
-                    
-                    OutlinedButton(
-                        onClick = { showTimePicker = true },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Schedule, contentDescription = null)
-                        Spacer(modifier = Modifier.padding(4.dp))
-                        Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(deadlineTimestamp)))
+
+                    AnimatedVisibility(visible = hasDeadline) {
+                        Column {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showDatePicker = true },
+                                    shape = MaterialTheme.shapes.medium,
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                ) {
+                                    Icon(Icons.Default.CalendarToday, contentDescription = null)
+                                    Spacer(modifier = Modifier.padding(4.dp))
+                                    val dateText = remember(deadlineTimestamp) {
+                                        val locale = Locale.getDefault()
+                                        if (locale.language == "zh") {
+                                            java.text.SimpleDateFormat("MM月dd日", locale).format(Date(deadlineTimestamp))
+                                        } else {
+                                            DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(deadlineTimestamp))
+                                        }
+                                    }
+                                    Text(
+                                        text = dateText,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
+                                
+                                OutlinedButton(
+                                    onClick = { showTimePicker = true },
+                                    shape = MaterialTheme.shapes.medium,
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                ) {
+                                    Icon(Icons.Default.Schedule, contentDescription = null)
+                                    Spacer(modifier = Modifier.padding(4.dp))
+                                    Text(
+                                        text = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(deadlineTimestamp)),
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -197,12 +266,12 @@ fun TodoEditScreen(
                     }
                     showDatePicker = false
                 }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         ) {
@@ -219,6 +288,7 @@ fun TodoEditScreen(
         )
 
         AlertDialog(
+            modifier = Modifier.fillMaxWidth(),
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
@@ -229,12 +299,12 @@ fun TodoEditScreen(
                     deadlineTimestamp = newCalendar.timeInMillis
                     showTimePicker = false
                 }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showTimePicker = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             },
             text = {
@@ -242,7 +312,7 @@ fun TodoEditScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        "Select time",
+                        stringResource(R.string.select_time),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(bottom = 20.dp)
                     )
