@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.google.gson)
     implementation(libs.pinyin4j)
+    implementation(libs.okhttp)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

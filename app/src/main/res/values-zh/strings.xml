@@ -51,4 +51,17 @@
     <string name="sort_title">按首字母排序</string>
     <string name="sort_date_created">按创建时间排序</string>
     <string name="sort_date_modified">按修改时间排序</string>
+    <string name="pinned">置顶</string>
+    <string name="ai_assistant">AI 助理</string>
+    <string name="ai_assistant_title">AI 助理</string>
+    <string name="settings">设置</string>
+    <string name="api_key">API Key</string>
+    <string name="model_name">模型名称</string>
+    <string name="type_message">输入消息...</string>
+    <string name="send">发送</string>
+    <string name="get_api_key_guide">访问硅基流动官网以获取API KEY</string>
+    <string name="copy">复制</string>
+    <string name="save_as_note">保存为笔记</string>
+    <string name="save_as_todo">保存为待办</string>
+    <string name="new_chat">新对话</string>
 </resources>

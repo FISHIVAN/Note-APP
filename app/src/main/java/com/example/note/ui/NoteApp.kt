@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -29,8 +30,10 @@ import com.example.note.R
 import com.example.note.ui.screen.NoteEditScreen
 import com.example.note.ui.screen.NoteListScreen
 import com.example.note.ui.screen.TodoScreen
+import com.example.note.ui.screen.AiAssistantScreen
 import com.example.note.viewmodel.NoteViewModel
 import com.example.note.viewmodel.TodoViewModel
+import com.example.note.viewmodel.AiAssistantViewModel
 
 import com.example.note.ui.screen.TodoEditScreen
 
@@ -43,7 +46,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun NoteApp(
     noteViewModel: NoteViewModel,
-    todoViewModel: TodoViewModel
+    todoViewModel: TodoViewModel,
+    aiAssistantViewModel: AiAssistantViewModel
 ) {
     val navController = rememberNavController()
 
@@ -58,6 +62,7 @@ fun NoteApp(
             MainScreen(
                 noteViewModel = noteViewModel,
                 todoViewModel = todoViewModel,
+                aiAssistantViewModel = aiAssistantViewModel,
                 onNoteClick = { noteId ->
                     navController.navigate("edit/$noteId")
                 },
@@ -113,14 +118,15 @@ fun NoteApp(
 fun MainScreen(
     noteViewModel: NoteViewModel,
     todoViewModel: TodoViewModel,
+    aiAssistantViewModel: AiAssistantViewModel,
     onNoteClick: (Long) -> Unit,
     onAddNoteClick: () -> Unit,
     onTodoClick: (Long) -> Unit,
     onAddTodoClick: () -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val items = listOf(R.string.notes, R.string.todos)
-    val icons = listOf(Icons.Default.Description, Icons.AutoMirrored.Filled.Assignment)
+    val items = listOf(R.string.notes, R.string.ai_assistant, R.string.todos)
+    val icons = listOf(Icons.Default.Description, Icons.Filled.AutoAwesome, Icons.AutoMirrored.Filled.Assignment)
 
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
@@ -193,7 +199,10 @@ fun MainScreen(
                         onNoteClick = onNoteClick,
                         onAddNoteClick = onAddNoteClick
                     )
-                    1 -> TodoScreen(
+                    1 -> AiAssistantScreen(
+                        viewModel = aiAssistantViewModel
+                    )
+                    2 -> TodoScreen(
                         viewModel = todoViewModel,
                         onTodoClick = onTodoClick,
                         onAddTodoClick = onAddTodoClick
