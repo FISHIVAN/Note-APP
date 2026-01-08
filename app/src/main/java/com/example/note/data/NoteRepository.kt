@@ -14,7 +14,7 @@ class NoteRepository(
 
     suspend fun getNoteById(id: Long): Note? = noteDao.getNoteById(id)
 
-    suspend fun insertNote(note: Note) = noteDao.insertNote(note)
+    suspend fun insertNote(note: Note): Long = noteDao.insertNote(note)
 
     suspend fun updateNote(note: Note) = noteDao.updateNote(note)
 

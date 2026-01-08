@@ -93,7 +93,8 @@ object RichTextHelper {
         while (boldMatcher.find()) tokens.add(Token(boldMatcher.start(), "**", TokenType.Bold))
         
         // _
-        val italicMatcher = Pattern.compile("_").matcher(text)
+        // Ignore intraword underscores (GFM style) to avoid bad parsing of snake_case (e.g. FISH_200516)
+        val italicMatcher = Pattern.compile("(?<![\\p{L}\\p{N}])_|_(?![\\p{L}\\p{N}])").matcher(text)
         while (italicMatcher.find()) tokens.add(Token(italicMatcher.start(), "_", TokenType.Italic))
         
         // Color

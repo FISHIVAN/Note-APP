@@ -7,12 +7,13 @@ data class AiMessage(
     val content: String,
     val isUser: Boolean,
     val timestamp: Long = System.currentTimeMillis(),
-    val pendingAction: AiAction? = null
+    val pendingActions: List<AiAction> = emptyList()
 )
 
 sealed class AiAction {
     data class CreateNote(val title: String, val content: String) : AiAction()
     data class CreateTodo(val content: String) : AiAction()
+    data class CreateMapNote(val locationName: String, val content: String) : AiAction()
     data class UpdateNote(val id: Long, val title: String, val content: String) : AiAction()
     data class UpdateTodo(val id: Long, val content: String) : AiAction()
 }

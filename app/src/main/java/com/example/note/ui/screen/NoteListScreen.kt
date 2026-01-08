@@ -67,10 +67,17 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material3.IconButton
+import com.example.note.ui.utils.BounceIconButton
+import com.example.note.ui.utils.BounceFloatingActionButton
+import com.example.note.ui.utils.BounceTextButton
+import androidx.compose.material3.LocalRippleConfiguration
 
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -114,6 +121,8 @@ import net.sourceforge.pinyin4j.PinyinHelper
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.shadow
@@ -121,6 +130,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import com.example.note.util.RichTextHelper
 
@@ -135,12 +145,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.filled.Check
 import com.example.note.viewmodel.SortOption
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NoteListScreen(
     viewModel: NoteViewModel,
     onNoteClick: (Long) -> Unit,
-    onAddNoteClick: () -> Unit
+    onAddNoteClick: () -> Unit,
+    bottomPadding: Dp = 0.dp
 ) {
     val notes by viewModel.notes.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -153,27 +166,18 @@ fun NoteListScreen(
     val density = LocalDensity.current
     var headerHeightPx by remember { mutableStateOf(0f) }
     val headerHeight = with(density) { headerHeightPx.toDp() }
+    
+    // Main list states
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyStaggeredGridState()
+    val scope = rememberCoroutineScope()
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal),
         floatingActionButton = {
-            val interactionSource = remember { MutableInteractionSource() }
-            val isPressed by interactionSource.collectIsPressedAsState()
-            val scale by animateFloatAsState(
-                targetValue = if (isPressed) 0.9f else 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                ),
-                label = "fab_scale"
-            )
-            FloatingActionButton(
+            BounceFloatingActionButton(
                 onClick = onAddNoteClick,
-                interactionSource = interactionSource,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
+                modifier = Modifier.padding(bottom = bottomPadding)
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_note))
             }
@@ -194,11 +198,14 @@ fun NoteListScreen(
                 NoteListContent(
                     notes = notes,
                     isGridMode = isGridMode,
+                    listState = listState,
+                    gridState = gridState,
                     onNoteClick = onNoteClick,
                     onDeleteNote = { viewModel.deleteNote(it) },
                     onPinNote = { viewModel.togglePin(it) },
                     onEmptySpaceClick = null,
                     topPadding = headerHeight,
+                    bottomPadding = bottomPadding,
                     sortOption = sortOption
                 )
             }
@@ -209,6 +216,7 @@ fun NoteListScreen(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .zIndex(1f)
+                    .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                     .onGloballyPositioned { coordinates ->
                         headerHeightPx = coordinates.size.height.toFloat()
                     },
@@ -216,20 +224,24 @@ fun NoteListScreen(
                 shadowElevation = 0.dp
             ) {
                 Column(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(bottom = 8.dp)
+        ) {
+            AnimatedVisibility(
+                visible = !active,
+                enter = fadeIn(animationSpec = tween(600)) + scaleIn(initialScale = 0.9f, animationSpec = tween(600)),
+                exit = fadeOut(animationSpec = tween(200))
+            ) {
+                Text(
+                    text = stringResource(R.string.notes),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .statusBarsPadding()
-                        .padding(bottom = 16.dp)
-                ) {
-                    AnimatedVisibility(visible = !active) {
-                        Text(
-                            text = stringResource(R.string.notes),
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .padding(horizontal = 24.dp)
-                                .padding(top = 24.dp, bottom = 16.dp)
-                        )
-                    }
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 12.dp, bottom = 8.dp)
+                )
+            }
 
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
@@ -254,13 +266,21 @@ fun NoteListScreen(
                                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                                 trailingIcon = {
                                     Row {
-                                        IconButton(onClick = { 
+                                        BounceIconButton(onClick = { 
                                             val nextOption = when (sortOption) {
                                                 SortOption.MODIFIED_DATE -> SortOption.CREATED_DATE
                                                 SortOption.CREATED_DATE -> SortOption.TITLE
                                                 SortOption.TITLE -> SortOption.MODIFIED_DATE
                                             }
                                             viewModel.setSortOption(nextOption)
+                                            // Scroll to top when sorting changes
+                                            scope.launch {
+                                                if (isGridMode) {
+                                                    gridState.animateScrollToItem(0)
+                                                } else {
+                                                    listState.animateScrollToItem(0)
+                                                }
+                                            }
                                             val toastMessage = when (nextOption) {
                                                 SortOption.MODIFIED_DATE -> R.string.sort_date_modified
                                                 SortOption.CREATED_DATE -> R.string.sort_date_created
@@ -274,7 +294,7 @@ fun NoteListScreen(
                                             )
                                         }
 
-                                        IconButton(onClick = { viewModel.toggleGridMode() }) {
+                                        BounceIconButton(onClick = { viewModel.toggleGridMode() }) {
                                             Icon(
                                                 imageVector = if (isGridMode) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                                                 contentDescription = if (isGridMode) stringResource(R.string.list_view) else stringResource(R.string.grid_view)
@@ -315,6 +335,8 @@ fun NoteListScreen(
                              NoteListContent(
                                 notes = notes,
                                 isGridMode = isGridMode,
+                                listState = rememberLazyListState(),
+                                gridState = rememberLazyStaggeredGridState(),
                                 onNoteClick = { 
                                     onNoteClick(it)
                                     active = false 
@@ -323,6 +345,7 @@ fun NoteListScreen(
                                 onPinNote = { viewModel.togglePin(it) },
                                 onEmptySpaceClick = { active = false },
                                 topPadding = 0.dp,
+                                bottomPadding = bottomPadding,
                                 sortOption = sortOption
                              )
                         }
@@ -333,16 +356,98 @@ fun NoteListScreen(
     }
 }
 
+// Extension functions for smoother scrolling
+private suspend fun LazyListState.animateScrollToItemSlow(
+    index: Int,
+    stiffness: Float = Spring.StiffnessVeryLow
+) {
+    val info = layoutInfo
+    val visibleItems = info.visibleItemsInfo
+    if (visibleItems.isEmpty()) {
+        animateScrollToItem(index)
+        scrollToItem(index)
+        return
+    }
+
+    val currentFirstIndex = firstVisibleItemIndex
+    if (index == currentFirstIndex && firstVisibleItemScrollOffset == 0) return
+
+    // Calculate average item size
+    val averageSize = visibleItems.map { it.size }.average().toFloat()
+    var distance = (index - currentFirstIndex) * averageSize
+
+    // Correction for scrolling to top: Overestimate distance to ensure we reach the start
+    // This prevents stopping short due to inaccurate average item size estimation
+    if (index == 0) {
+        distance *= 2.5f
+    }
+
+    // Animate scroll by distance using a low stiffness spring for a slower, smoother movement
+    // This avoids the "snap" effect of default animateScrollToItem for large distances
+    animateScrollBy(
+        value = distance,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = stiffness
+        )
+    )
+
+    // Final correction to ensure exact alignment
+    animateScrollToItem(index)
+    scrollToItem(index)
+}
+
+private suspend fun LazyStaggeredGridState.animateScrollToItemSlow(
+    index: Int,
+    stiffness: Float = Spring.StiffnessVeryLow
+) {
+    val info = layoutInfo
+    val visibleItems = info.visibleItemsInfo
+    if (visibleItems.isEmpty()) {
+        animateScrollToItem(index)
+        scrollToItem(index)
+        return
+    }
+
+    val currentFirstIndex = firstVisibleItemIndex
+    if (index == currentFirstIndex && firstVisibleItemScrollOffset == 0) return
+
+    // Calculate average height
+    val averageHeight = visibleItems.map { it.size.height }.average().toFloat()
+    // For grid with 2 columns, the vertical distance is roughly (index diff / 2) * height
+    val rows = (index - currentFirstIndex) / 2f
+    var distance = rows * averageHeight
+
+    // Correction for scrolling to top: Overestimate distance to ensure we reach the start
+    if (index == 0) {
+        distance *= 2.5f
+    }
+
+    animateScrollBy(
+        value = distance,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = stiffness
+        )
+    )
+
+    animateScrollToItem(index)
+    scrollToItem(index)
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun NoteListContent(
     notes: List<Note>,
     isGridMode: Boolean,
+    listState: LazyListState,
+    gridState: LazyStaggeredGridState,
     onNoteClick: (Long) -> Unit,
     onDeleteNote: (Note) -> Unit,
     onPinNote: (Note) -> Unit,
     onEmptySpaceClick: (() -> Unit)?,
     topPadding: Dp,
+    bottomPadding: Dp,
     sortOption: SortOption,
     modifier: Modifier = Modifier
 ) {
@@ -350,53 +455,13 @@ private fun NoteListContent(
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     val emptySpaceInteractionSource = remember { MutableInteractionSource() }
     
-    // Scroll states
-    val listState = rememberLazyListState()
-    val gridState = rememberLazyStaggeredGridState()
-    
-    // State to track if we need to scroll to top after pin action
-    var scrollToTopPending by remember { mutableStateOf(false) }
-    var shouldAnimateScroll by remember { mutableStateOf(true) }
+    // State to track target note for scrolling
+    var targetScrollNoteId by remember { mutableStateOf<Long?>(null) }
 
-    // Handle pin and scroll to top
+    // Handle pin and scroll to target note
     val handlePinAndScroll: (Note) -> Unit = { note ->
-        val isPinned = note.isPinned
-        // Determine current scroll position
-        val firstIndex = if (isGridMode) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
-        
         onPinNote(note)
-        
-        // Optimization logic:
-        // 1. If pinning (moving to top) and we are far down (> 3 items), snap to top to avoid visual chaos.
-        // 2. If unpinning (moving down), we are usually at top. If so, don't force scroll (avoid conflict).
-        // 3. Otherwise, animate smoothly.
-        if (!isPinned) { // Action is PIN
-            if (firstIndex > 3) {
-                shouldAnimateScroll = false
-                scrollToTopPending = true
-            } else {
-                shouldAnimateScroll = true
-                scrollToTopPending = true
-            }
-        } else { // Action is UNPIN
-            if (firstIndex > 0) {
-                shouldAnimateScroll = true
-                scrollToTopPending = true
-            } else {
-                // Already at top, let the list layout animation handle it naturally.
-                // No need to force scroll.
-                scrollToTopPending = false
-            }
-        }
-    }
-
-    // Scroll to top when sortOption changes
-    LaunchedEffect(sortOption) {
-        if (isGridMode) {
-            gridState.animateScrollToItem(0)
-        } else {
-            listState.animateScrollToItem(0)
-        }
+        targetScrollNoteId = note.id
     }
     
     // Index Bar state
@@ -405,38 +470,44 @@ private fun NoteListContent(
     var showMagnifier by remember { mutableStateOf(false) }
     var lastScrollTime by remember { mutableStateOf(0L) }
 
-    // Filter notes based on selection
-    val filteredNotes = remember(notes, filterLetter) {
-        val letter = filterLetter
-        if (letter == null) {
-            notes
+    // Filter notes based on selection (run in background to avoid UI lag)
+    val filteredNotes by androidx.compose.runtime.produceState(initialValue = notes, key1 = notes, key2 = filterLetter) {
+        if (filterLetter == null) {
+            value = notes
         } else {
-            notes.filter { note ->
-                val title = note.title.trim()
-                if (title.isEmpty()) return@filter false
-                
-                val firstChar = title.first()
-                
-                if (letter == '#') {
-                     // Match non-letter characters (symbols, numbers)
-                     // Exclude English letters
-                     if (firstChar in 'A'..'Z' || firstChar in 'a'..'z') return@filter false
-                     
-                     // Exclude Chinese characters (check if they have Pinyin)
-                     val pinyinArray = PinyinHelper.toHanyuPinyinStringArray(firstChar)
-                     if (pinyinArray != null && pinyinArray.isNotEmpty()) return@filter false
-                     
-                     true
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val letter = filterLetter
+                if (letter == null) {
+                    notes
                 } else {
-                    if (firstChar.equals(letter, ignoreCase = true)) {
-                        true
-                    } else {
-                        val pinyinArray = PinyinHelper.toHanyuPinyinStringArray(firstChar)
-                        if (pinyinArray != null && pinyinArray.isNotEmpty()) {
-                            val firstPinyinChar = pinyinArray[0][0]
-                            firstPinyinChar.equals(letter, ignoreCase = true)
+                    notes.filter { note ->
+                        val title = note.title.trim()
+                        if (title.isEmpty()) return@filter false
+                        
+                        val firstChar = title.first()
+                        
+                        if (letter == '#') {
+                             // Match non-letter characters (symbols, numbers)
+                             // Exclude English letters
+                             if (firstChar in 'A'..'Z' || firstChar in 'a'..'z') return@filter false
+                             
+                             // Exclude Chinese characters (check if they have Pinyin)
+                             val pinyinArray = PinyinHelper.toHanyuPinyinStringArray(firstChar)
+                             if (pinyinArray != null && pinyinArray.isNotEmpty()) return@filter false
+                             
+                             true
                         } else {
-                            false
+                            if (firstChar.equals(letter, ignoreCase = true)) {
+                                true
+                            } else {
+                                val pinyinArray = PinyinHelper.toHanyuPinyinStringArray(firstChar)
+                                if (pinyinArray != null && pinyinArray.isNotEmpty()) {
+                                    val firstPinyinChar = pinyinArray[0][0]
+                                    firstPinyinChar.equals(letter, ignoreCase = true)
+                                } else {
+                                    false
+                                }
+                            }
                         }
                     }
                 }
@@ -446,17 +517,32 @@ private fun NoteListContent(
 
     // Handle auto scroll when data changes due to pin action
     LaunchedEffect(filteredNotes) {
-        if (scrollToTopPending) {
-            // Small delay to ensure list layout is updated with new order
-            // If snapping, we can be faster.
-            delay(if (shouldAnimateScroll) 100 else 50)
-            
-            if (isGridMode) {
-                if (shouldAnimateScroll) gridState.animateScrollToItem(0) else gridState.scrollToItem(0)
-            } else {
-                if (shouldAnimateScroll) listState.animateScrollToItem(0) else listState.scrollToItem(0)
+        targetScrollNoteId?.let { id ->
+            val index = filteredNotes.indexOfFirst { it.id == id }
+            if (index >= 0) {
+                // Reduced delay to minimize visual pause while ensuring layout update
+                delay(20)
+                val note = filteredNotes[index]
+                if (note.isPinned) {
+                    // For pinning, always scroll to top to ensure visibility of pinned section
+                    if (isGridMode) {
+                        gridState.animateScrollToItemSlow(0, stiffness = Spring.StiffnessLow)
+                    } else {
+                        listState.animateScrollToItemSlow(0, stiffness = Spring.StiffnessLow)
+                    }
+                } else {
+                    // For unpinning (scrolling down), use slow animation for smoothness
+                    if (isGridMode) {
+                        gridState.animateScrollToItemSlow(index)
+                    } else {
+                        listState.animateScrollToItemSlow(index)
+                    }
+                }
             }
-            scrollToTopPending = false
+            // Add a delay to ensure the zIndex remains high during the entire placement animation
+            // The placement animation uses Low stiffness which can take longer than the scroll
+            delay(800)
+            targetScrollNoteId = null
         }
     }
 
@@ -466,7 +552,7 @@ private fun NoteListContent(
             title = { Text(stringResource(R.string.delete_note)) },
             text = { Text(stringResource(R.string.confirm_delete_note)) },
             confirmButton = {
-                androidx.compose.material3.TextButton(
+                BounceTextButton(
                     onClick = {
                         noteToDelete?.let { onDeleteNote(it) }
                         noteToDelete = null
@@ -476,7 +562,7 @@ private fun NoteListContent(
                 }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { noteToDelete = null }) {
+                BounceTextButton(onClick = { noteToDelete = null }) {
                     Text(stringResource(R.string.cancel))
                 }
             },
@@ -520,7 +606,7 @@ private fun NoteListContent(
                     LazyVerticalStaggeredGrid(
                         columns = StaggeredGridCells.Fixed(2),
                         state = gridState,
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp, top = topPadding),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp + bottomPadding, top = topPadding),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalItemSpacing = 12.dp,
                         modifier = Modifier
@@ -541,11 +627,24 @@ private fun NoteListContent(
                                 onPinNote = handlePinAndScroll,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .zIndex(if (note.id == targetScrollNoteId) 1f else 0f) // Ensure moving item stays on top
                                     .animateItem(
-                                        placementSpec = spring(
-                                            dampingRatio = Spring.DampingRatioLowBouncy,
-                                            stiffness = Spring.StiffnessLow
-                                        )
+                                        placementSpec = if (note.id == targetScrollNoteId) {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessLow
+                                            )
+                                        } else if (targetScrollNoteId != null) {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = 10000f
+                                            )
+                                        } else {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        }
                                     )
                             )
                         }
@@ -553,7 +652,7 @@ private fun NoteListContent(
                 } else {
                     LazyColumn(
                         state = listState,
-                        contentPadding = PaddingValues(bottom = 88.dp, top = topPadding),
+                        contentPadding = PaddingValues(bottom = 88.dp + bottomPadding, top = topPadding),
                         modifier = Modifier
                             .fillMaxSize()
                             .clickable(
@@ -572,11 +671,24 @@ private fun NoteListContent(
                                 onPinNote = handlePinAndScroll,
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .zIndex(if (note.id == targetScrollNoteId) 1f else 0f) // Ensure moving item stays on top
                                     .animateItem(
-                                        placementSpec = spring(
-                                            dampingRatio = Spring.DampingRatioLowBouncy,
-                                            stiffness = Spring.StiffnessLow
-                                        )
+                                        placementSpec = if (note.id == targetScrollNoteId) {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessLow
+                                            )
+                                        } else if (targetScrollNoteId != null) {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = 10000f
+                                            )
+                                        } else {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        }
                                     )
                             )
                         }
@@ -762,7 +874,7 @@ fun SwipeableNoteItem(
             }
             false
         },
-        positionalThreshold = { it * 0.35f }
+        positionalThreshold = { it * 0.5f }
     )
 
     SwipeToDismissBox(
@@ -851,8 +963,9 @@ fun NoteItem(
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = if (note.isPinned) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = if (note.isPinned) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -895,7 +1008,8 @@ fun NoteItem(
             Text(
                 text = RichTextHelper.markdownToRichText(note.content),
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
+                maxLines = 2,
+                minLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

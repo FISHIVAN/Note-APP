@@ -11,5 +11,10 @@ data class Note(
     val timestamp: Long,
     val isPinned: Boolean = false,
     val category: String? = null,
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val aiSummary: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val address: String? = null,
+    val markerColor: Float = 0f // Stores BitmapDescriptorFactory.HUE_AZURE etc. Default AZURE (210f)
 )

@@ -16,8 +16,12 @@ materialIconsExtended = "1.7.5"
 tinypinyin = "2.0.3"
 pinyin4j = "2.5.1"
 okhttp = "4.12.0"
+amap3d = "9.8.3"
+amapSearch = "9.7.1"
 
 [libraries]
+amap-map = { group = "com.amap.api", name = "3dmap", version.ref = "amap3d" }
+amap-search = { group = "com.amap.api", name = "search", version.ref = "amapSearch" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 pinyin4j = { group = "com.belerweb", name = "pinyin4j", version.ref = "pinyin4j" }
 tinypinyin = { group = "com.github.promeg", name = "tinypinyin", version.ref = "tinypinyin" }

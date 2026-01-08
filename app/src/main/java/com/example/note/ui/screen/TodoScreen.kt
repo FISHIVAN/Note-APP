@@ -48,6 +48,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,12 +72,29 @@ import com.example.note.R
 import java.text.DateFormat
 import java.util.Date
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.filled.Refresh
+
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.Dp
+
+import com.example.note.ui.utils.BounceFloatingActionButton
+import com.example.note.ui.utils.BounceTextButton
+
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoScreen(
     viewModel: TodoViewModel,
     onAddTodoClick: () -> Unit,
-    onTodoClick: (Long) -> Unit
+    onTodoClick: (Long) -> Unit,
+    bottomPadding: Dp = 0.dp
 ) {
     val todos by viewModel.todos.collectAsState()
     val density = LocalDensity.current
@@ -84,9 +102,12 @@ fun TodoScreen(
     val headerHeight = with(density) { headerHeightPx.toDp() }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal),
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddTodoClick) {
+            BounceFloatingActionButton(
+                onClick = onAddTodoClick,
+                modifier = Modifier.padding(bottom = bottomPadding)
+            ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_todo))
             }
         }
@@ -107,7 +128,8 @@ fun TodoScreen(
                     onToggle = { viewModel.toggleTodo(it) },
                     onDelete = { viewModel.deleteTodo(it) },
                     onTodoClick = onTodoClick,
-                    topPadding = headerHeight
+                    topPadding = headerHeight,
+                    bottomPadding = bottomPadding
                 )
             }
 
@@ -117,6 +139,7 @@ fun TodoScreen(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .zIndex(1f)
+                    .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                     .onGloballyPositioned { coordinates ->
                         headerHeightPx = coordinates.size.height.toFloat()
                     },
@@ -126,7 +149,7 @@ fun TodoScreen(
                 Column(
                     modifier = Modifier
                         .statusBarsPadding()
-                        .padding(bottom = 16.dp)
+                        .padding(bottom = 8.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.todos),
@@ -134,7 +157,7 @@ fun TodoScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
                             .padding(horizontal = 24.dp)
-                            .padding(top = 24.dp, bottom = 16.dp)
+                            .padding(top = 12.dp, bottom = 8.dp)
                     )
                 }
             }
@@ -149,7 +172,8 @@ fun TodoListContent(
     onToggle: (Todo) -> Unit,
     onDelete: (Todo) -> Unit,
     onTodoClick: (Long) -> Unit,
-    topPadding: androidx.compose.ui.unit.Dp
+    topPadding: androidx.compose.ui.unit.Dp,
+    bottomPadding: Dp
 ) {
     val haptic = LocalHapticFeedback.current
     var todoToDelete by remember { mutableStateOf<Todo?>(null) }
@@ -160,7 +184,7 @@ fun TodoListContent(
             title = { Text(stringResource(R.string.delete_todo)) },
             text = { Text(stringResource(R.string.confirm_delete_todo)) },
             confirmButton = {
-                TextButton(
+                BounceTextButton(
                     onClick = {
                         todoToDelete?.let { onDelete(it) }
                         todoToDelete = null
@@ -170,7 +194,7 @@ fun TodoListContent(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { todoToDelete = null }) {
+                BounceTextButton(onClick = { todoToDelete = null }) {
                     Text(stringResource(R.string.cancel))
                 }
             },
@@ -180,50 +204,59 @@ fun TodoListContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp, top = topPadding),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp + bottomPadding, top = topPadding),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(todos, key = { it.id }) { todo ->
+            val currentTodo by rememberUpdatedState(todo)
             val dismissState = rememberSwipeToDismissBoxState(
                 confirmValueChange = {
-                    if (it == SwipeToDismissBoxValue.EndToStart) {
-                        todoToDelete = todo
+                    if (it == SwipeToDismissBoxValue.StartToEnd) {
+                        onToggle(currentTodo)
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        false
+                        false // Don't dismiss, just toggle
                     } else {
                         false
                     }
-                }
+                },
+                positionalThreshold = { it * 0.5f }
             )
 
             SwipeToDismissBox(
                 state = dismissState,
                 backgroundContent = {
                     val color = when (dismissState.dismissDirection) {
-                        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+                        SwipeToDismissBoxValue.StartToEnd -> if (todo.isDone) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer
                         else -> Color.Transparent
                     }
+                    val icon = if (todo.isDone) Icons.Default.Undo else Icons.Default.Check
+                    
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(MaterialTheme.shapes.medium)
                             .background(color)
                             .padding(16.dp),
-                        contentAlignment = Alignment.CenterEnd
+                        contentAlignment = Alignment.CenterStart
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.delete),
-                            tint = MaterialTheme.colorScheme.onErrorContainer
+                            imageVector = icon,
+                            contentDescription = if (todo.isDone) "Mark as Undone" else "Mark as Done",
+                            tint = if (todo.isDone) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     }
                 },
-                enableDismissFromStartToEnd = false
+                enableDismissFromStartToEnd = true,
+                enableDismissFromEndToStart = false
             ) {
                 TodoItem(
                     todo = todo,
                     onToggle = { onToggle(todo) },
-                    onClick = { onTodoClick(todo.id) }
+                    onClick = { onTodoClick(todo.id) },
+                    onLongClick = { 
+                        todoToDelete = todo
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -231,11 +264,13 @@ fun TodoListContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TodoItem(
     todo: Todo,
     onToggle: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -250,18 +285,20 @@ fun TodoItem(
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (todo.isDone) 0.dp else 2.dp),
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .clickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = onClick,
+                onLongClick = onLongClick
             )
     ) {
         Row(
@@ -277,19 +314,21 @@ fun TodoItem(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 8.dp)
+                    .padding(start = 12.dp)
             ) {
                 Text(
                     text = todo.content,
                     style = MaterialTheme.typography.bodyLarge,
                     textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
-                    color = if (todo.isDone) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                    color = if (todo.isDone) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (todo.isDone) FontWeight.Normal else FontWeight.Medium
                 )
                 if (todo.deadline != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(todo.deadline)),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

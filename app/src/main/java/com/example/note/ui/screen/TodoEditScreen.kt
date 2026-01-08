@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
@@ -64,9 +66,23 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.ui.res.stringResource
 import com.example.note.R
+
+import com.example.note.ui.utils.BounceIconButton
+import com.example.note.ui.utils.BounceFloatingActionButton
+import com.example.note.ui.utils.BounceOutlinedButton
+import com.example.note.ui.utils.BounceTextButton
+
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,28 +115,20 @@ fun TodoEditScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
         topBar = {
             TopAppBar(
+                modifier = Modifier.clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)),
                 title = { Text(if (todoId == -1L) stringResource(R.string.new_todo) else stringResource(R.string.edit_todo)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
+                    BounceIconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
         },
         floatingActionButton = {
-            val interactionSource = remember { MutableInteractionSource() }
-            val isPressed by interactionSource.collectIsPressedAsState()
-            val scale by animateFloatAsState(
-                targetValue = if (isPressed) 0.9f else 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                ),
-                label = "fab_scale"
-            )
-            FloatingActionButton(
+            BounceFloatingActionButton(
                 onClick = {
                     if (content.isNotBlank()) {
                         viewModel.saveTodo(
@@ -131,13 +139,7 @@ fun TodoEditScreen(
                     }
                     onNavigateUp()
                 },
-                interactionSource = interactionSource,
-                modifier = Modifier
-                    .imePadding()
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }
+                modifier = Modifier.imePadding().padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
             ) {
                 Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
             }
@@ -147,7 +149,9 @@ fun TodoEditScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Content Block
@@ -201,7 +205,7 @@ fun TodoEditScreen(
                                 modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                OutlinedButton(
+                                BounceOutlinedButton(
                                     onClick = { showDatePicker = true },
                                     shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier.weight(1f).fillMaxHeight()
@@ -223,7 +227,7 @@ fun TodoEditScreen(
                                     )
                                 }
                                 
-                                OutlinedButton(
+                                BounceOutlinedButton(
                                     onClick = { showTimePicker = true },
                                     shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier.weight(1f).fillMaxHeight()
@@ -241,6 +245,8 @@ fun TodoEditScreen(
                     }
                 }
             }
+            
+            Spacer(modifier = Modifier.height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
         }
     }
 
@@ -251,7 +257,7 @@ fun TodoEditScreen(
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                BounceTextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
                         // Preserve time part
                         val calendar = Calendar.getInstance()
@@ -270,7 +276,7 @@ fun TodoEditScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
+                BounceTextButton(onClick = { showDatePicker = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
@@ -291,7 +297,7 @@ fun TodoEditScreen(
             modifier = Modifier.fillMaxWidth(),
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                BounceTextButton(onClick = {
                     val newCalendar = Calendar.getInstance()
                     newCalendar.timeInMillis = deadlineTimestamp
                     newCalendar.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
@@ -303,7 +309,7 @@ fun TodoEditScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) {
+                BounceTextButton(onClick = { showTimePicker = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             },

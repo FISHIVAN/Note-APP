@@ -1,5 +1,7 @@
 package com.example.note.ui.screen
 
+import androidx.compose.foundation.layout.IntrinsicSize
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -67,6 +70,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -96,6 +100,22 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.roundToInt
+
+import com.example.note.ui.utils.BounceIconButton
+import com.example.note.ui.utils.BounceFloatingActionButton
+import com.example.note.ui.utils.BounceIconToggleButton
+import com.example.note.ui.utils.BounceTextButton
+import com.example.note.ui.utils.bounceClick
+
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, FlowPreview::class, ExperimentalFoundationApi::class)
 @Composable
@@ -227,13 +247,15 @@ fun NoteEditScreen(
         androidx.compose.runtime.snapshotFlow { content }
             .debounce(1000)
             .collect { value ->
-                // Convert RichText back to Markdown for saving
-                val markdown = RichTextHelper.richTextToMarkdown(value.annotatedString)
-                if (currentNote != null && markdown != currentNote!!.content) {
-                    viewModel.updateNote(currentNote!!.copy(
-                        content = markdown,
-                        timestamp = System.currentTimeMillis()
-                    ))
+                // Offload heavy parsing to background thread
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    val markdown = RichTextHelper.richTextToMarkdown(value.annotatedString)
+                    if (currentNote != null && markdown != currentNote!!.content) {
+                        viewModel.updateNote(currentNote!!.copy(
+                            content = markdown,
+                            timestamp = System.currentTimeMillis()
+                        ))
+                    }
                 }
             }
     }
@@ -241,28 +263,20 @@ fun NoteEditScreen(
 
 
     Scaffold(
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
         topBar = {
             TopAppBar(
+                modifier = Modifier.clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)),
                 title = { Text(if (noteId == -1L) stringResource(R.string.new_note) else stringResource(R.string.edit_note)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
+                    BounceIconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
         },
         floatingActionButton = {
-            val interactionSource = remember { MutableInteractionSource() }
-            val isPressed by interactionSource.collectIsPressedAsState()
-            val scale by animateFloatAsState(
-                targetValue = if (isPressed) 0.9f else 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                ),
-                label = "fab_scale"
-            )
-            FloatingActionButton(
+            BounceFloatingActionButton(
                 onClick = {
                     if (title.isNotBlank() || content.text.isNotBlank()) {
                         val markdown = RichTextHelper.richTextToMarkdown(content.annotatedString)
@@ -284,13 +298,7 @@ fun NoteEditScreen(
                     }
                     onNavigateUp()
                 },
-                interactionSource = interactionSource,
-                modifier = Modifier
-                    .imePadding()
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }
+                modifier = Modifier.imePadding().padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
             ) {
                 Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
             }
@@ -300,7 +308,9 @@ fun NoteEditScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Title Block
@@ -337,7 +347,7 @@ fun NoteEditScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    IconToggleButton(
+                    BounceIconToggleButton(
                         checked = activeStyles.contains(RichTextHelper.RichTextStyle.Bold),
                         onCheckedChange = { toggleStyle(RichTextHelper.RichTextStyle.Bold) }
                     ) {
@@ -348,7 +358,7 @@ fun NoteEditScreen(
                         )
                     }
                     
-                    IconToggleButton(
+                    BounceIconToggleButton(
                         checked = activeStyles.contains(RichTextHelper.RichTextStyle.Italic),
                         onCheckedChange = { toggleStyle(RichTextHelper.RichTextStyle.Italic) }
                     ) {
@@ -359,7 +369,7 @@ fun NoteEditScreen(
                         )
                     }
                     
-                    IconToggleButton(
+                    BounceIconToggleButton(
                         checked = activeStyles.contains(RichTextHelper.RichTextStyle.Heading),
                         onCheckedChange = { toggleStyle(RichTextHelper.RichTextStyle.Heading) }
                     ) {
@@ -370,7 +380,7 @@ fun NoteEditScreen(
                         )
                     }
                     
-                    IconToggleButton(
+                    BounceIconToggleButton(
                         checked = activeStyles.contains(RichTextHelper.RichTextStyle.List),
                         onCheckedChange = { toggleStyle(RichTextHelper.RichTextStyle.List) }
                     ) {
@@ -383,10 +393,24 @@ fun NoteEditScreen(
                     
                     // Color Picker
                     // Long press to open picker, Click to toggle current color
+                    val colorInteractionSource = remember { MutableInteractionSource() }
+                    val isColorPressed by colorInteractionSource.collectIsPressedAsState()
+                    val colorScale by animateFloatAsState(
+                        targetValue = if (isColorPressed) 0.9f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                        label = "color_scale"
+                    )
+
                     Box(
                         modifier = Modifier
+                            .graphicsLayer {
+                                scaleX = colorScale
+                                scaleY = colorScale
+                            }
                             .clip(CircleShape)
                             .combinedClickable(
+                                interactionSource = colorInteractionSource,
+                                indication = null,
                                 onClick = {
                                     if (activeColor == selectedTextColor) {
                                         applyColor(Color.Unspecified)
@@ -407,10 +431,24 @@ fun NoteEditScreen(
                     
                     // Highlight Picker
                     // Long press to open picker, Click to toggle current highlight
+                    val highlightInteractionSource = remember { MutableInteractionSource() }
+                    val isHighlightPressed by highlightInteractionSource.collectIsPressedAsState()
+                    val highlightScale by animateFloatAsState(
+                        targetValue = if (isHighlightPressed) 0.9f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                        label = "highlight_scale"
+                    )
+
                     Box(
                         modifier = Modifier
+                            .graphicsLayer {
+                                scaleX = highlightScale
+                                scaleY = highlightScale
+                            }
                             .clip(CircleShape)
                             .combinedClickable(
+                                interactionSource = highlightInteractionSource,
+                                indication = null,
                                 onClick = {
                                     if (activeBg == selectedHighlightColor) {
                                         applyHighlight(Color.Unspecified)
@@ -435,7 +473,7 @@ fun NoteEditScreen(
             Surface(
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                modifier = Modifier.fillMaxWidth().weight(1f)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 TextField(
                     value = content,
@@ -459,9 +497,11 @@ fun NoteEditScreen(
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent
                     ),
-                    modifier = Modifier.fillMaxSize().padding(8.dp)
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp).padding(8.dp)
                 )
             }
+            
+            Spacer(modifier = Modifier.height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
         }
     }
     
@@ -590,12 +630,12 @@ fun ColorPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onColorSelected(selectedColor) }) {
+            BounceTextButton(onClick = { onColorSelected(selectedColor) }) {
                 Text(stringResource(R.string.ok))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            BounceTextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
             }
         }
@@ -729,12 +769,12 @@ fun HighlightPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onColorSelected(finalColor) }) {
+            BounceTextButton(onClick = { onColorSelected(finalColor) }) {
                 Text(stringResource(R.string.ok))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            BounceTextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
             }
         }

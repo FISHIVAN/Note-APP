@@ -1,8 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
 android {
@@ -15,10 +23,27 @@ android {
         applicationId = "com.example.note"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 6
+        versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        manifestPlaceholders["AMAP_API_KEY"] = localProperties.getProperty("AMAP_API_KEY", "")
+
+        ndk {
+            // 高德地图SDK支持的架构
+            abiFilters.add("armeabi-v7a")
+            abiFilters.add("arm64-v8a")
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 
     buildTypes {
@@ -59,6 +84,9 @@ dependencies {
     implementation(libs.google.gson)
     implementation(libs.pinyin4j)
     implementation(libs.okhttp)
+    // implementation(libs.amap.map)
+    // implementation(libs.amap.search)
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
